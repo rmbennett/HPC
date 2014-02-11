@@ -22,7 +22,6 @@ int main(int argc, char *argv[])
 	}
 
 
-
 	while(1){
 		// Buffer containing one sample (left and right, both 16 bit).
 		int16_t samples[n*2];
@@ -30,12 +29,17 @@ int main(int argc, char *argv[])
 		
 		// Read one sample from input
 		int got=read(STDIN_FILENO, samples, cbBuffer);
-		if(got<0){
+		if(got<0)
+		{
 			fprintf(stderr, "%s : Read from stdin failed, error=%s.", argv[0], strerror(errno));
 			exit(1);
-		}else if(got==0){
+		}
+		else if(got==0)
+		{
 			break;	 // end of file
-		}else if(got!=cbBuffer){
+		}
+		else if(got!=cbBuffer)
+		{
 			fprintf(stderr, "\n got = %d and cbBuffer = %d ", got, cbBuffer);
 			fprintf(stderr, "%s : Did not receive expected number of bytes.\n", argv[0]);
 			break;
@@ -43,10 +47,13 @@ int main(int argc, char *argv[])
 		
 		// Copy one sample to output
 		int done=write(STDOUT_FILENO, samples, cbBuffer);
-		if(done<0){
+		if(done<0)
+		{
 			fprintf(stderr, "%s : Write to stdout failed, error=%s.", argv[0], strerror(errno));
 			exit(1);
-		}else if(done!=cbBuffer){
+		}
+		else if(done!=cbBuffer)
+		{
 			fprintf(stderr, "%s : Could not read requested number of bytes from stream.\n", argv[0]);
 		}
 	}
