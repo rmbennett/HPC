@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
 			}
 			else if(got==0)
 			{
-				break;	 // end of file //at some point deal with EOInput
+				break;	 // end of file //at some point deal with EO_Input
 			}
 		
 		bytes_read += got;

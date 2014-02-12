@@ -40,7 +40,7 @@ show_windows :
 
 # This is a template that applies a given input mp3 identified by $(1), into 
 #  a wav file filtered with coeffient set $(2)
-define template_filter =
+define template_filter
 
 working/$(1)_$(2).wav : inputs/$(1).mp3 coeffs/$(2).csv
 	$(MP3_FILE_SRC) inputs/$(1).mp3 \
@@ -58,7 +58,7 @@ $(foreach i,$(INPUTS),$(foreach f,$(FILTERS),$(eval $(call template_filter,$(i),
 
 # A second template that analyses a wav file containint m3 $(1) filtered by coeffs $(2),
 # using a window of size $(3)
-define template_analyse= 
+define template_analyse
 
 # Each output will be one line of a csv file containing the mp3, filter, and window,
 #  plus the resulting correlation for that triple
