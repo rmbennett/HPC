@@ -6,95 +6,139 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
- /* Not technically required, but needed on some UNIX distributions */
+/* Not technically required, but needed on some UNIX distributions */
 #include <sys/types.h>
 #include <sys/stat.h>
 #define NUM_SAMPLES 512
-//Output left = ch1left+ch2left /2 
-//Output right = ch1right+ch2right /2 
+#define CHANNELS 2
+
+//double x[N];
+//double sample_in = 0;
+//int16_t samples[NUM_SAMPLES*2];
+double * coefficients;
+//double * samples;
+
 
 int main(int argc, char *argv[])
 {	
-	int stream1;
-	int stream2;
+	//int stream1;
+	//int stream2;
 	
+	FILE * coeffFile;
 
-	if(argc < 3)
+	if(argc < 2)
 	{
 		fprintf(stderr, "Not enough inputs");
 		exit(1);
 	}
 	else
 	{
-		//http://codewiki.wikidot.com/c:system-calls:open
-		stream1 = open(argv[1], O_RDONLY);
-		stream2 = open(argv[2], O_RDONLY);		
+		coeffFile = fopen(argv[1], "r");		
 	}
-	int16_t sample1[NUM_SAMPLES];
-	int16_t sample2[NUM_SAMPLES];
-	int16_t output_stream[NUM_SAMPLES];
-	unsigned cbBuffer1=sizeof(stream1);	// size in bytes of 
-	unsigned cbBuffer2=sizeof(stream2);	
-	while(1)
+
+
+	double tmp;
+	int counter = 0;
+	
+	
+	if (coeffFile) 
 	{
-		// Buffer containing one sample (left and right, both 16 bit).
+    	while (fscanf(coeffFile, "%lf", &tmp)!=EOF)
+        	counter++;
+	    coefficients = malloc(counter*sizeof(double));
+    	if (coefficients == NULL)
+    	{
+    		fprintf(stderr, "Not enough inputs\n");
+    		exit(1);
+    	}
+    	rewind(coeffFile);
+    	for(int i=0; i < counter; i++)
+    	{	
+			if(fscanf(coeffFile, "%lf", &coefficients[i]) == EOF)
+    		{
+	    		fprintf(stderr, "Failed\n");
+    		}
+    	}
+    	
+	}
+	fclose(coeffFile);
+
+	int16_t *samples = malloc(counter*sizeof(int16_t)*2); //Data read into here
+	int16_t *oldBuffer = malloc(counter*sizeof(int16_t)*2);	//For buffer overflow.
+	int16_t *output_stream = malloc(counter*sizeof(int16_t)*2); //Data piped to STDOUT
+	int16_t *intermediate_stream = malloc(counter*sizeof(int16_t)*2); //Intermediate stream for copying old_buffer to samples
+	unsigned cbBuffer= counter*sizeof(int16_t)*2;
+	int end = (cbBuffer/(sizeof(int16_t)*CHANNELS));
+
+	while(1)
+	{	
+		// Read sample from input
+		int bytes_read = 0;
+		while(bytes_read != cbBuffer)
+		{
+			int got=read(STDIN_FILENO, samples+(bytes_read/sizeof(int16_t)), cbBuffer-bytes_read);
+			if(got<0)
+			{
+				fprintf(stderr, "%s : Read from stdin failed, error=%s.", argv[0], strerror(errno));
+				exit(1);
+			}
+			else if(got==0)
+			{
+				break;	 // end of file //at some point deal with EOInput
+			}
 		
-		// Read one sample from input
-		int got_stream1=read(stream1, sample1, cbBuffer1);
-		if(got_stream1<0)
-		{
-			fprintf(stderr, "%s : Read from stdin failed, error=%s.", argv[0], strerror(errno));
-			exit(1);
+		bytes_read += got;
 		}
-		else if(got_stream1==0)
+		
+		for(int i = 0; i < end; ++i)
 		{
-			break;	 // end of file
-		}
-		else if(got_stream1!=cbBuffer1)
-		{
-			fprintf(stderr, "\n got = %d and cbBuffer = %d ", got_stream1, cbBuffer1);
-			fprintf(stderr, "%s : Did not receive expected number of bytes.\n", argv[0]);
-			break;
+			//Here be dragons... Very Very SLOW Dragons...
+			int16_t *read_ptr = samples + i*2;
+			double leftChannel = 0; 
+			double rightChannel = 0;
+
+			for(int j = 0; j<= i; ++j)
+			{
+				leftChannel += *(read_ptr)*coefficients[j];
+				rightChannel += *(read_ptr + 1)*coefficients[j];		
+				read_ptr = read_ptr -2;
+			}
+			read_ptr = oldBuffer+(CHANNELS*counter)-2;
+
+			for(int j = i+1; j < counter; ++j)
+			{
+				leftChannel += *(read_ptr)*coefficients[j];
+				rightChannel += *(read_ptr + 1)*coefficients[j];
+				read_ptr = read_ptr-2;
+			}
+
+			output_stream[i*2] = (int16_t)leftChannel; //right output channel takes even values
+			output_stream[i*2 + 1] = (int16_t)rightChannel; // left output channel takes odd values;
 		}
 
-		// Read one sample from input
-		int got_stream2=read(stream2, sample2, cbBuffer2);
-		if(got_stream2<0)
-		{
-			fprintf(stderr, "%s : Read from stdin failed, error=%s.", argv[0], strerror(errno));
-			exit(1);
-		}
-		else if(got_stream2==0)
-		{
-			break;	 // end of file
-		}
-		else if(got_stream2!=cbBuffer2)
-		{
-			fprintf(stderr, "\n got = %d and cbBuffer = %d ", got_stream2, cbBuffer2);
-			fprintf(stderr, "%s : Did not receive expected number of bytes.\n", argv[0]);
-			break;
-		}
-
-		for (int i = 0;  i < sizeof(sample2); ++i) {
-			output_stream[i] = sample2[i]/2 + sample1[i]/2;
-		}
-
-		int done=write(STDOUT_FILENO, output_stream, cbBuffer2);
+		// Copy one sample to output
+		int done=write(STDOUT_FILENO, output_stream, cbBuffer);
 		if(done<0)
 		{
 			fprintf(stderr, "%s : Write to stdout failed, error=%s.", argv[0], strerror(errno));
 			exit(1);
 		}
-		else if(done!=cbBuffer2)
+		else if(done!=cbBuffer)
 		{
 			fprintf(stderr, "%s : Could not read requested number of bytes from stream.\n", argv[0]);
 		}
 
-
+		intermediate_stream = samples;
+		samples = oldBuffer;
+		oldBuffer = intermediate_stream;
 	}
 
-	close(stream1);
-	close(stream2);
+
+
+		
+
+	
 	return 0;
 }
+
 
