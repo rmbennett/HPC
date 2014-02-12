@@ -133,12 +133,6 @@ int main(int argc, char *argv[])
 		oldBuffer = intermediate_stream;
 	}
 
-
-
-		
-
 	
 	return 0;
 }
-
-
