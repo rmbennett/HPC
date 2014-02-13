@@ -12,11 +12,9 @@
 #define NUM_SAMPLES 512
 #define CHANNELS 2
 
-//double x[N];
-//double sample_in = 0;
-//int16_t samples[NUM_SAMPLES*2];
+
 double * coefficients;
-//double * samples;
+
 
 
 int main(int argc, char *argv[])
@@ -92,8 +90,9 @@ int main(int argc, char *argv[])
 		
 		for(int i = 0; i < end; ++i)
 		{
-			//Here be dragons... Very Very SLOW Dragons...
-			int16_t *read_ptr = samples + i*2;
+			
+			//FIR Filter reference - github.com/lawliet89/
+			int16_t *read_ptr = samples + i*2; 
 			double leftChannel = 0; 
 			double rightChannel = 0;
 
@@ -101,8 +100,9 @@ int main(int argc, char *argv[])
 			{
 				leftChannel += *(read_ptr)*coefficients[j];
 				rightChannel += *(read_ptr + 1)*coefficients[j];		
-				read_ptr = read_ptr -2;
+				read_ptr = read_ptr-2;
 			}
+			
 			read_ptr = oldBuffer+(CHANNELS*counter)-2;
 
 			for(int j = i+1; j < counter; ++j)
@@ -112,8 +112,8 @@ int main(int argc, char *argv[])
 				read_ptr = read_ptr-2;
 			}
 
-			output_stream[i*2] = (int16_t)leftChannel; //right output channel takes even values
-			output_stream[i*2 + 1] = (int16_t)rightChannel; // left output channel takes odd values;
+			output_stream[i*2] = (int16_t)leftChannel; //left output channel takes even values
+			output_stream[i*2 + 1] = (int16_t)rightChannel; // right output channel takes odd values;
 		}
 
 		// Copy one sample to output
